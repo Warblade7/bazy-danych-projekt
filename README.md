@@ -2,6 +2,8 @@
 
 Python 3.13+ generator for synthetic PostgreSQL public transport data. Dependencies and the virtual environment are managed with `uv`.
 
+The phase 3 report (DBMS choice, schema, data generation and volumetry) is in [`docs/raport3.md`](docs/raport3.md).
+
 ## Setup and run
 
 Run the commands from the repository root unless noted otherwise:
