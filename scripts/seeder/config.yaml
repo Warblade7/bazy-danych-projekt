@@ -1,0 +1,62 @@
+seed: 42
+
+database:
+  host: localhost
+  port: 5434
+  name: public_transport
+  user: postgres
+  password: postgres_dev
+
+generation:
+  stops: 150
+  lines: 40
+  trips: 3000
+  drivers: 400
+  vehicles: 250
+  days_of_executions: 730
+  # might cause performance issues if set too high
+  target_trip_executions: 100000
+  connections_per_trip:
+    min: 6
+    max: 18
+  # delete existing data before seeding
+  truncate_existing: true
+
+
+realism:
+  geography:
+    center_lat: 35.3748
+    center_lon: -120.8468
+    radius_km: 16
+
+  # Fractions of trips that are tram, express, on-request, screen, and low-floor vehicles.
+  tram_fraction: 0.30
+  express_fraction: 0.12
+  on_request_fraction: 0.10
+  screen_fraction: 0.35
+  low_floor_fraction: 0.85
+
+  departures:
+    # weighting of departures by hour of the day (0-23) for weekdays and weekends
+    weekday_weights: [1, 1, 1, 1, 3, 8, 18, 30, 30, 18, 15, 15, 16, 18, 22, 30, 30, 25, 20, 14, 10, 7, 5, 3]
+    weekend_weights: [2, 2, 1, 1, 2, 4, 7, 10, 12, 15, 18, 20, 22, 22, 22, 22, 22, 20, 18, 16, 12, 9, 6, 4]
+    rush_hour_multiplier: 1.5
+    night_traffic_multiplier: 0.3
+
+  connections:
+    average_speed_kmh: 23 
+    travel_minutes:
+      min: 2
+      max: 9
+    dwell_seconds: 30
+
+  delays:
+    on_time_probability: 0.70
+    average_delay_minutes: 4
+    max_delay_minutes: 30
+
+  enforce_resource_conflicts: true
+
+performance:
+  batch_size: 50000
+  use_copy: true

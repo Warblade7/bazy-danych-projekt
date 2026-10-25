@@ -1,0 +1,343 @@
+# absolutely no idea what inspiration could this be
+first_names:
+  - Adam
+  - Adrian
+  - Alex
+  - Alexander
+  - Alice
+  - Amanda
+  - Amelia
+  - Andrew
+  - Anthony
+  - Ashley
+  - Benjamin
+  - Blake
+  - Brandon
+  - Brian
+  - Caleb
+  - Cameron
+  - Carlos
+  - Carmen
+  - Charlotte
+  - Chloe
+  - Chris
+  - Claire
+  - Connor
+  - Daniel
+  - David
+  - Diana
+  - Diego
+  - Dylan
+  - Elena
+  - Emily
+  - Emma
+  - Eric
+  - Ethan
+  - Evelyn
+  - Felix
+  - Gabriel
+  - Grace
+  - Hannah
+  - Henry
+  - Isabella
+  - Jack
+  - Jackie
+  - Jacob
+  - James
+  - Jason
+  - Jessica
+  - Johnny
+  - Jordan
+  - Joseph
+  - Joshua
+  - Julia
+  - Kevin
+  - Laura
+  - Liam
+  - Lily
+  - Logan
+  - Lucas
+  - Lucy
+  - Marcus
+  - Maria
+  - Mason
+  - Matthew
+  - Maya
+  - Michael
+  - Mia
+  - Miguel
+  - Misty
+  - Nathan
+  - Nicholas
+  - Nicole
+  - Noah
+  - Olivia
+  - Oscar
+  - Patrick
+  - Rebecca
+  - Richard
+  - Robert
+  - Ryan
+  - Samantha
+  - Sarah
+  - Sebastian
+  - Sofia
+  - Sophia
+  - Thomas
+  - Tyler
+  - Vanessa
+  - Victoria
+  - Vincent
+  - William
+  - Yuki
+  - Akira
+  - Hiroshi
+  - Kenji
+  - Takashi
+  - Hanako
+  - Mei
+  - Wei
+  - Viktor
+  - Sasha
+  - Vladimir
+
+last_names:
+  - Anderson
+  - Baker
+  - Bennett
+  - Brooks
+  - Brown
+  - Campbell
+  - Carter
+  - Clark
+  - Collins
+  - Cooper
+  - Davis
+  - Edwards
+  - Evans
+  - Foster
+  - Garcia
+  - Green
+  - Hall
+  - Harris
+  - Hayes
+  - Henderson
+  - Hill
+  - Howard
+  - Jackson
+  - Johnson
+  - Jones
+  - Kelly
+  - King
+  - Lewis
+  - Martin
+  - Miller
+  - Mitchell
+  - Moore
+  - Morgan
+  - Murphy
+  - Nelson
+  - Parker
+  - Peterson
+  - Phillips
+  - Reed
+  - Richardson
+  - Roberts
+  - Robinson
+  - Rogers
+  - Russell
+  - Scott
+  - Smith
+  - Stewart
+  - Sullivan
+  - Taylor
+  - Thompson
+  - Turner
+  - Walker
+  - Ward
+  - Watson
+  - White
+  - Williams
+  - Wilson
+  - Wright
+  - Young
+  - Martinez
+  - Rodriguez
+  - Hernandez
+  - Lopez
+  - Gonzalez
+  - Ramirez
+  - Torres
+  - Rivera
+  - Flores
+  - Morales
+  - Castillo
+  - Vargas
+  - Alvarez
+  - Mendoza
+  - Santiago
+  - Nakamura
+  - Tanaka
+  - Yamamoto
+  - Sato
+  - Suzuki
+  - Kobayashi
+  - Takahashi
+  - Watanabe
+  - Chen
+  - Wang
+  - Zhang
+  - Liu
+  - Huang
+  - Kim
+  - Park
+  - Lee
+  - Kowalski
+  - Nowak
+  - Olszewski
+  - Zielinski
+  - Wisniewski
+  - Lewandowski
+  - Ivanov
+  - Petrov
+  - Volkov
+  - Sokolov
+
+line_names:
+  - City Center
+  - Corpo Plaza
+  - Downtown
+  - Arasaka Waterfront
+  - Memorial Park
+  - Reconciliation Park
+  - Little China
+  - Kabuki
+  - Northside
+  - Charter Hill
+  - Japantown
+  - North Oak
+  - Wellsprings
+  - The Glen
+  - Vista del Rey
+  - Arroyo
+  - Rancho Coronado
+  - Santo Domingo
+  - Pacifica
+  - West Wind Estate
+  - Coastview
+  - Dogtown
+  - Longshore Stacks
+  - Golden Pacific
+  - Badlands
+  - Rocky Ridge
+  - Jackson Plains
+  - Biotechnica Flats
+  - Night City University
+  - NCART Central
+  - Metro Memorial
+  - Metro Congress
+  - Metro Republic
+  - Megabuilding H10
+  - Megabuilding H8
+  - Megabuilding H4
+  - Afterlife
+  - Lizzie's Bar
+  - Clouds
+  - Konpeki Plaza
+  - Embers
+  - Totentanz
+  - El Coyote Cojo
+  - Riot
+  - Dark Matter
+  - Arasaka Tower
+  - Militech Industrial
+  - Kang Tao
+  - Petrochem
+  - Night Corp
+  - Trauma Team
+  - Delamain HQ
+  - All Foods
+  - Grand Imperial Mall
+  - EBM Petrochem Stadium
+  - Black Sapphire
+  - Heavy Hearts
+  - Morro Rock
+  - Orbital Air
+  - Spaceport
+
+
+stop_names:
+  - Corpo Plaza - Underground
+  - Corpo Plaza - Executive Tower
+  - Arasaka Tower - Service Entrance
+  - Arasaka Waterfront - Cargo Terminal
+  - Downtown - Financial District
+  - Downtown - Central Station
+  - City Center - Corporate Boulevard
+  - City Center - Night Market
+  - Watson - Industrial District
+  - Watson - North Terminal
+  - Kabuki - Riverside Market
+  - Kabuki - Medical Center
+  - Little China - Metro Station
+  - Little China - Apartment Blocks
+  - Northside - Factory District
+  - Northside - Container Terminal
+  - Megabuilding H10 - South Entrance
+  - Megabuilding H8 - Parking Garage
+  - Megabuilding H4 - Main Entrance
+  - Japantown - Central Plaza
+  - Japantown - Market Street
+  - Japantown - Metro Entrance
+  - Charter Hill - Business Center
+  - Charter Hill - Residential Towers
+  - North Oak - Estate Entrance
+  - North Oak - Security Gate
+  - Westbrook - Shopping District
+  - Westbrook - Transit Hub
+  - Heywood - Central Market
+  - Heywood - Community Center
+  - The Glen - Residential District
+  - The Glen - Metro Station
+  - Vista del Rey - Industrial Road
+  - Vista del Rey - Riverside
+  - Wellsprings - Beachfront
+  - Wellsprings - Apartment Complex
+  - Santo Domingo - Power Plant
+  - Santo Domingo - Logistics Center
+  - Arroyo - Industrial Terminal
+  - Arroyo - Workers District
+  - Rancho Coronado - Central Square
+  - Rancho Coronado - Bus Terminal
+  - Pacifica - Metro Terminal
+  - Pacifica - Coastal Highway
+  - Coastview - Beach Access
+  - Coastview - Shopping Center
+  - West Wind Estate - Residential Blocks
+  - West Wind Estate - Metro Entrance
+  - Dogtown - North Gate
+  - Dogtown - Supply Depot
+  - Dogtown - Market District
+  - Longshore Stacks - Transit Terminal
+  - Golden Pacific - Main Boulevard
+  - Golden Pacific - Abandoned Station
+  - Badlands - Highway Junction
+  - Badlands - Service Station
+  - Biotechnica Flats - Agricultural Zone
+  - Biotechnica Flats - Research Complex
+  - Morro Rock - Transit Station
+  - Spaceport - Passenger Terminal
+
+vehicle_makes:
+  - Villefort
+  - Makigai
+  - Mahir
+  - Thorton
+  - Archer
+
+vehicle_models:
+  - Columbus
+  - Maimai
+  - Supron
+  - Colby
+  - Hella
