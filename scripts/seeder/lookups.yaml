@@ -341,3 +341,24 @@ vehicle_models:
   - Supron
   - Colby
   - Hella
+
+# Optional: build the free-text vehicles.notes; {year} is replaced with a year after production.
+vehicle_equipment:
+  - air conditioning
+  - CCTV
+  - ticket machine
+  - USB charging ports
+  - passenger information screens
+  - audio stop announcements
+  - bike rack
+  - free Wi-Fi
+
+vehicle_events:
+  - Major overhaul in {year}.
+  - Repainted in the new livery in {year}.
+  - Interior refurbished in {year}.
+  - Accident damage repaired in {year}.
+  - Drive system replaced in {year}.
+  - Seats replaced with a new layout in {year}.
+  - Kept as a reserve vehicle for peak hours.
+  - Assigned to driver training.

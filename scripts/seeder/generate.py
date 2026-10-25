@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import heapq
 import io
 import math
 import os
@@ -34,9 +35,12 @@ def load_lookups(path):
     lookups = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
     if not isinstance(lookups, dict):
         raise ValueError('Lookups must be a YAML mapping')
-    for key in ('first_names', 'last_names', 'line_names', 'stop_names', 'vehicle_makes', 'vehicle_models'):
+    for key in ('vehicle_equipment', 'vehicle_events'):
+        lookups.setdefault(key, [])
+    for key in ('first_names', 'last_names', 'line_names', 'stop_names', 'vehicle_makes', 'vehicle_models',
+                'vehicle_equipment', 'vehicle_events'):
         values = lookups.get(key)
-        if not isinstance(values, list) or not values:
+        if not isinstance(values, list) or (not values and key not in ('vehicle_equipment', 'vehicle_events')):
             raise ValueError(f'lookups.{key} must be a nonempty list')
         if any(not isinstance(value, str) or not value.strip() for value in values):
             raise ValueError(f'lookups.{key} must contain nonempty strings')
@@ -68,6 +72,7 @@ def normalize_config(cfg):
     g, r = cfg['generation'], cfg['realism']
     if 'days_of_executions' in g:
         g['execution_days'] = g.pop('days_of_executions')
+    g.setdefault('start_date', date(2024, 1, 1))
     geography = r.pop('geography', {})
     for k in ('center_lat', 'center_lon', 'radius_km'):
         if k in geography:
@@ -108,21 +113,46 @@ def normalize_config(cfg):
 
 def validate(c):
     g, r, p = c['generation'], c['realism'], c['performance']
-    for key in ('stops', 'lines', 'trips', 'drivers', 'vehicles', 'execution_days', 'target_trip_executions'):
+    for key in ('stops', 'lines', 'trips', 'drivers', 'vehicles', 'execution_days'):
         if not isinstance(g[key], int) or g[key] < 0:
             raise ValueError(f'generation.{key} must be a nonnegative integer')
+    if not isinstance(g['start_date'], date) or isinstance(g['start_date'], datetime):
+        raise ValueError('generation.start_date must be a date in YYYY-MM-DD format')
     if g['stops'] < 2 or g['lines'] < 1 or g['trips'] < g['lines']:
         raise ValueError('Need >=2 stops, >=1 lines, and trips >= lines')
     bounds = g['connections_per_trip']
     if not 1 <= bounds['min'] <= bounds['max']:
         raise ValueError('connections_per_trip requires 1 <= min <= max')
-    if g['target_trip_executions'] and (not g['drivers'] or not g['vehicles'] or not g['execution_days']):
-        raise ValueError('Executions require drivers, vehicles and days')
+    if g['execution_days'] and (not g['drivers'] or not g['vehicles']):
+        raise ValueError('Executions require drivers and vehicles')
+    for key, default in (('layover_minutes', 5), ('max_driver_minutes_per_day', 540),
+                         ('driver_daily_rest_minutes', 660), ('max_shift_span_minutes', 720),
+                         ('driver_days_off_per_week', 2)):
+        r.setdefault(key, default)
+    for key in ('layover_minutes', 'max_driver_minutes_per_day', 'driver_daily_rest_minutes',
+                'max_shift_span_minutes'):
+        if not isinstance(r[key], int) or r[key] < 0:
+            raise ValueError(f'realism.{key} must be a nonnegative integer')
+    if r['driver_days_off_per_week'] not in range(7):
+        raise ValueError('realism.driver_days_off_per_week must be between 0 and 6')
+    for key, default in (('vehicle_inspection_interval_days', 30), ('vehicle_repairs_per_year', 2),
+                         ('vehicle_repair_days', {'min': 2, 'max': 10}), ('driver_summer_leave_days', 14),
+                         ('driver_other_leave_blocks', [7, 5]), ('driver_sick_days_per_year', 8)):
+        r.setdefault(key, default)
+    lengths = [r['vehicle_inspection_interval_days'], r['vehicle_repairs_per_year'], r['driver_summer_leave_days'],
+               r['driver_sick_days_per_year'], *r['driver_other_leave_blocks']]
+    if any(not isinstance(v, int) or v < 0 for v in lengths) or any(v > 92 for v in r['driver_other_leave_blocks']) \
+            or r['driver_summer_leave_days'] > 92:
+        raise ValueError('Maintenance and absence settings must be nonnegative integers (leave blocks up to 92 days)')
+    if not 1 <= r['vehicle_repair_days']['min'] <= r['vehicle_repair_days']['max'] <= 92:
+        raise ValueError('realism.vehicle_repair_days requires 1 <= min <= max <= 92')
     for key in ('weekday_weights', 'weekend_weights'):
         if len(r[key]) != 24 or any(x < 0 for x in r[key]) or sum(r[key]) == 0:
             raise ValueError(f'{key} must contain 24 nonnegative weights with positive sum')
+    r.setdefault('public_holidays', True)
+    r.setdefault('unexecuted_trip_fraction', 0.0)
     for key in ('tram_fraction', 'express_fraction', 'on_request_fraction', 'screen_fraction',
-                'low_floor_fraction', 'on_time_probability'):
+                'low_floor_fraction', 'on_time_probability', 'unexecuted_trip_fraction'):
         if not 0 <= r[key] <= 1:
             raise ValueError(f'realism.{key} must be in [0,1]')
     if r['min_segment_minutes'] < 1 or r['max_segment_minutes'] < r['min_segment_minutes']:
@@ -177,6 +207,81 @@ def choose_departure(rng, r, weekend):
     return hour * 60 + rng.randrange(60)
 
 
+def polish_holidays(year):
+    """Statutory public holidays in Poland (Easter via the anonymous Gregorian algorithm)."""
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    easter = date(year, (h + l - 7 * m + 114) // 31, (h + l - 7 * m + 114) % 31 + 1)
+    days = {date(year, 1, 1), date(year, 1, 6), easter, easter + timedelta(days=1),
+            date(year, 5, 1), date(year, 5, 3), easter + timedelta(days=49), easter + timedelta(days=60),
+            date(year, 8, 15), date(year, 11, 1), date(year, 11, 11), date(year, 12, 25), date(year, 12, 26)}
+    if year >= 2025:  # Christmas Eve became a public holiday in 2025
+        days.add(date(year, 12, 24))
+    return days
+
+
+def vehicle_note(rng, lookups, produced, last_year, low_floor):
+    """Free-text description for vehicles.notes; about one vehicle in five has none."""
+    if rng.random() < 0.2:
+        return None
+    pool = lookups['vehicle_equipment']
+    equipment = rng.sample(pool, min(len(pool), rng.randint(1, 4)))
+    if low_floor:
+        equipment.append('wheelchair ramp')
+    parts = []
+    if equipment:
+        listed = equipment[0] if len(equipment) == 1 else ', '.join(equipment[:-1]) + ' and ' + equipment[-1]
+        parts.append(f'Equipped with {listed}.')
+    events = [e for e in lookups['vehicle_events'] if '{year}' not in e or produced < last_year]
+    for event in rng.sample(events, min(len(events), rng.randint(0, 2))):
+        parts.append(event.format(year=rng.randint(produced + 1, last_year)) if '{year}' in event else event)
+    return ' '.join(parts) or None
+
+
+def spell(rng, first, last, length):
+    """Day ordinals of a block of `length` days starting at a random day in [first, last - length + 1]."""
+    start = rng.randint(first.toordinal(), max(first.toordinal(), last.toordinal() - length + 1))
+    return range(start, start + length)
+
+
+def vehicle_downtime(rng, vehicles, years, r):
+    """Days each vehicle is out of service: periodic one-day inspections plus random multi-day repairs."""
+    down = defaultdict(set)
+    interval, repair = r['vehicle_inspection_interval_days'], r['vehicle_repair_days']
+    for v in vehicles:
+        if interval:
+            offset = rng.randrange(interval)
+            down[v].update(o for y in years for o in range(date(y, 1, 1).toordinal(), date(y, 12, 31).toordinal() + 1)
+                           if (o - offset) % interval == 0)
+        for y in years:
+            for _ in range(rng.randint(0, 2 * r['vehicle_repairs_per_year'])):
+                down[v].update(spell(rng, date(y, 1, 1), date(y, 12, 31), rng.randint(repair['min'], repair['max'])))
+    return down
+
+
+def driver_absences(rng, drivers, years, r):
+    """Days each driver is away: a summer holiday, other leave blocks and sick leave spells."""
+    away = defaultdict(set)
+    for x in drivers:
+        for y in years:
+            if r['driver_summer_leave_days']:
+                away[x].update(spell(rng, date(y, 6, 1), date(y, 8, 31), r['driver_summer_leave_days']))
+            for length in r['driver_other_leave_blocks']:
+                away[x].update(spell(rng, date(y, 1, 1), date(y, 12, 31), length))
+            sick = rng.randint(0, 2 * r['driver_sick_days_per_year'])
+            while sick > 0:
+                length = min(sick, rng.randint(1, 5))
+                away[x].update(spell(rng, date(y, 1, 1), date(y, 12, 31), length))
+                sick -= length
+    return away
+
+
 def stops_data(rng, n, r, names):
     for i, name in enumerate(unique_names(rng, names, n), 1):
         radius = r['radius_km'] * math.sqrt(rng.random())
@@ -190,7 +295,7 @@ def stops_data(rng, n, r, names):
 def create_data(conn, cfg, lookups):
     rng = random.Random(cfg['seed'])
     g, r, batch = cfg['generation'], cfg['realism'], cfg['performance']['batch_size']
-    base = date.today()
+    base = g['start_date']
     dates = [base + timedelta(days=i) for i in range(g['execution_days'])]
     stop_coords = []
     stop_names = []
@@ -231,8 +336,15 @@ def create_data(conn, cfg, lookups):
                      (2, False, False, False, False, False, True, True, base, end_date)]
     rows_copy(conn, 'calendar', calendar_rows, batch)
     rows_copy(conn, 'exception_types', [(1, 'Added service'), (2, 'Removed service')], batch)
-    # Explicit exception example, but do not remove service to avoid surprising capacity loss.
-    rows_copy(conn, 'calendar_dates', [], batch)
+    # On a weekday public holiday the weekday service is removed and the weekend/holiday service runs instead.
+    holidays = set()
+    if r['public_holidays'] and dates:
+        holidays = {h for y in range(base.year, end_date.year + 1) for h in polish_holidays(y)
+                    if base <= h <= end_date and h.weekday() < 5}
+    rows_copy(conn, 'calendar_dates', (row for h in sorted(holidays) for row in ((1, h, 2), (2, h, 1))), batch)
+
+    def service_calendar(d):
+        return 2 if d.weekday() >= 5 or d in holidays else 1
 
     # Each trip stores its scheduled departure, end, and calendar for execution generation.
     trip_specs = []
@@ -283,50 +395,106 @@ def create_data(conn, cfg, lookups):
     rows_copy(conn, 'drivers', ((i, rng.choice(lookups['first_names']), rng.choice(lookups['last_names']),
                date(rng.randint(1960, 2004), rng.randint(1,12), rng.randint(1,28)),
                f'DRV-{i:09d}', True) for i in range(1, g['drivers']+1)), batch)
-    rows_copy(conn, 'vehicles', ((i, f'F-{i:07d}', rng.choice(lookups['vehicle_makes']),
-               rng.choice(lookups['vehicle_models']), rng.randint(2005, 2025),
-               f'DW-{i:07d}', rng.randint(60, 180), rng.random() < r['low_floor_fraction'], None)
-               for i in range(1, g['vehicles']+1)), batch)
+    # The schema has no vehicle type, so the fleet is split in proportion to tram/bus trips
+    # and the fleet number prefix (T-/B-) tells trams and buses apart.
+    tram_share = sum(line_types[t[1]] == 'TRAM' for t in trip_specs) / len(trip_specs)
+    trams = round(g['vehicles'] * tram_share)
+    if 0 < tram_share < 1:
+        trams = min(max(trams, 1), g['vehicles'] - 1)
+    vehicle_pools = {'TRAM': range(1, trams + 1), 'BUS': range(trams + 1, g['vehicles'] + 1)}
+    if g['execution_days'] and any(not vehicle_pools[line_types[t[1]]] for t in trip_specs):
+        raise ValueError('Not enough vehicles to cover both bus and tram lines')
+
+    def make_vehicles():
+        last_year = (dates[-1] if dates else base).year
+        for i in range(1, g['vehicles'] + 1):
+            make, model = rng.choice(lookups['vehicle_makes']), rng.choice(lookups['vehicle_models'])
+            produced, capacity = rng.randint(2005, 2025), rng.randint(60, 180)
+            low_floor = rng.random() < r['low_floor_fraction']
+            yield (i, f"{'T' if i <= trams else 'B'}-{i:07d}", make, model, produced, f'DW-{i:07d}',
+                   capacity, low_floor, vehicle_note(rng, lookups, produced, last_year, low_floor))
+
+    rows_copy(conn, 'vehicles', make_vehicles(), batch)
 
     def make_executions():
-        if not dates or not g['target_trip_executions']:
+        """Run the full timetable: every trip on every day its calendar (with exceptions) is in service."""
+        if not dates:
             return
-        # Use day-indexed candidates; repeated trip per day is disallowed.
-        candidates = [(d, t) for d in dates for t in trip_specs
-                      if (d.weekday() >= 5) == (t[5] == 2)]
-        rng.shuffle(candidates)
-        driver_busy = defaultdict(list)
-        vehicle_busy = defaultdict(list)
+        # Some trips stay planned only (no executions yet), e.g. newly added services.
+        unexecuted = set(rng.sample([t[0] for t in trip_specs],
+                                    round(len(trip_specs) * r['unexecuted_trip_fraction'])))
+        by_calendar = defaultdict(list)
+        for t in trip_specs:
+            if t[0] not in unexecuted:
+                by_calendar[t[5]].append(t)
+        all_drivers = range(1, g['drivers'] + 1)
+        years = range(dates[0].year, dates[-1].year + 1)
+        vehicle_down = vehicle_downtime(rng, range(1, g['vehicles'] + 1), years, r)
+        driver_away = driver_absences(rng, all_drivers, years, r)
+        driver_free = dict.fromkeys(all_drivers, 0)
+        vehicle_free = dict.fromkeys(range(1, g['vehicles'] + 1), 0)
         produced = 0
-        for d, t in candidates:
-            if produced >= g['target_trip_executions']:
-                break
-            tid, lid, route, start, end, cal = t
-            start_abs = d.toordinal()*1440 + start
-            end_abs = d.toordinal()*1440 + end
-            if r['enforce_resource_conflicts']:
-                # Randomized bounded search; favors scalability over optimal packing.
-                driver_id = next((x for x in rng.sample(range(1, g['drivers']+1),
-                    min(g['drivers'], 80)) if all(end_abs <= a or start_abs >= b
-                    for a,b in driver_busy[x])), None)
-                vehicle_id = next((x for x in rng.sample(range(1, g['vehicles']+1),
-                    min(g['vehicles'], 80)) if all(end_abs <= a or start_abs >= b
-                    for a,b in vehicle_busy[x])), None)
-                if driver_id is None or vehicle_id is None:
-                    continue
-                driver_busy[driver_id].append((start_abs, end_abs))
-                vehicle_busy[vehicle_id].append((start_abs, end_abs))
-            else:
-                driver_id = rng.randint(1, g['drivers'])
-                vehicle_id = rng.randint(1, g['vehicles'])
-            delay = 0 if rng.random() < r['on_time_probability'] else min(
-                r['max_delay_minutes'], round(rng.expovariate(1 / max(r['average_delay_minutes'], 0.01))))
-            produced += 1
-            yield (produced, tid, driver_id, vehicle_id, d,
-                   timestamp(d, start+delay), timestamp(d, end+delay))
-        if produced < g['target_trip_executions']:
-            raise ValueError(f'Could generate only {produced:,} of {g["target_trip_executions"]:,} requested '
-                             'executions. Increase days/trips/resources or disable conflict checking.')
+        for d in dates:
+            day_abs = d.toordinal() * 1440
+            # Draw delays first so resources are booked for the actual (delayed) times.
+            runs = []
+            for t in by_calendar[service_calendar(d)]:
+                delay = 0 if rng.random() < r['on_time_probability'] else min(
+                    r['max_delay_minutes'], round(rng.expovariate(1 / max(r['average_delay_minutes'], 0.01))))
+                runs.append((day_abs + t[3] + delay, day_abs + t[4] + delay, delay, t))
+            runs.sort(key=lambda run: run[0])
+            if not r['enforce_resource_conflicts']:
+                for start_abs, end_abs, delay, t in runs:
+                    produced += 1
+                    yield (produced, t[0], rng.randint(1, g['drivers']), rng.choice(vehicle_pools[line_types[t[1]]]),
+                           d, timestamp(d, t[3] + delay), timestamp(d, t[4] + delay))
+                continue
+            # Each resource waits in a heap until it is free; a freed one goes to an idle stack.
+            # Everyone free at midnight starts level (shuffled), so work rotates across the whole pool.
+            # Taking the most recently freed (LIFO) keeps a driver on consecutive trips, i.e. a shift.
+            today = d.toordinal()
+            on_duty = [x for x in all_drivers
+                       if (today + x) % 7 >= r['driver_days_off_per_week'] and today not in driver_away[x]]
+            rng.shuffle(on_duty)
+            driver_wait = [(max(driver_free[x], day_abs), i, x) for i, x in enumerate(on_duty)]
+            heapq.heapify(driver_wait)
+            driver_idle, driver_load, driver_first_start, driver_last_end = [], defaultdict(int), {}, {}
+            vehicle_wait, vehicle_idle = {}, {}
+            for kind, pool in vehicle_pools.items():
+                order = [v for v in pool if today not in vehicle_down[v]]
+                rng.shuffle(order)
+                vehicle_wait[kind] = [(max(vehicle_free[v], day_abs), i, v) for i, v in enumerate(order)]
+                heapq.heapify(vehicle_wait[kind])
+                vehicle_idle[kind] = []
+            for start_abs, end_abs, delay, t in runs:
+                kind, minutes = line_types[t[1]], end_abs - start_abs
+                while driver_wait and driver_wait[0][0] <= start_abs:
+                    driver_idle.append(heapq.heappop(driver_wait)[2])
+                while vehicle_wait[kind] and vehicle_wait[kind][0][0] <= start_abs:
+                    vehicle_idle[kind].append(heapq.heappop(vehicle_wait[kind])[2])
+                # A driver over the daily driving limit or the shift span is done for the day.
+                while driver_idle and (
+                        driver_load[driver_idle[-1]] + minutes > r['max_driver_minutes_per_day']
+                        or end_abs - driver_first_start.get(driver_idle[-1], start_abs) > r['max_shift_span_minutes']):
+                    driver_idle.pop()
+                if not driver_idle or not vehicle_idle[kind]:
+                    missing = 'drivers' if not driver_idle else f'{kind.lower()} vehicles'
+                    raise ValueError(f'Not enough {missing} on {d} at {clock(start_abs - day_abs)} to run the full '
+                                     'timetable. Increase generation.drivers / generation.vehicles.')
+                driver_id, vehicle_id = driver_idle.pop(), vehicle_idle[kind].pop()
+                free_at = end_abs + r['layover_minutes']
+                driver_free[driver_id] = vehicle_free[vehicle_id] = free_at
+                driver_load[driver_id] += minutes
+                driver_first_start.setdefault(driver_id, start_abs)
+                driver_last_end[driver_id] = end_abs
+                heapq.heappush(driver_wait, (free_at, produced, driver_id))
+                heapq.heappush(vehicle_wait[kind], (free_at, produced, vehicle_id))
+                produced += 1
+                yield (produced, t[0], driver_id, vehicle_id, d,
+                       timestamp(d, t[3] + delay), timestamp(d, t[4] + delay))
+            # A driver who worked today gets the daily rest before the next shift.
+            for driver_id, last_end in driver_last_end.items():
+                driver_free[driver_id] = last_end + r['driver_daily_rest_minutes']
 
     rows_copy(conn, 'trip_executions', make_executions(), batch)
 
@@ -345,7 +513,7 @@ def main():
     print('Configuration OK')
     g = cfg['generation']
     print(f"Stops={g['stops']:,}, lines={g['lines']:,}, trips={g['trips']:,}, "
-          f"target executions={g['target_trip_executions']:,}")
+          f"execution days={g['execution_days']:,}")
     if args.dry_run:
         return
     import psycopg

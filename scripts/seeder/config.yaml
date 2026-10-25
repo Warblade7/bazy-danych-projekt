@@ -11,11 +11,12 @@ generation:
   stops: 150
   lines: 40
   trips: 3000
-  drivers: 400
-  vehicles: 250
+  drivers: 1100
+  vehicles: 580
+  # first service day; executions cover days_of_executions days from here
+  start_date: 2024-01-01
+  # every trip runs on every day its calendar is in service (full timetable)
   days_of_executions: 730
-  # might cause performance issues if set too high
-  target_trip_executions: 100000
   connections_per_trip:
     min: 6
     max: 18
@@ -56,6 +57,33 @@ realism:
     max_delay_minutes: 30
 
   enforce_resource_conflicts: true
+
+  # weekday public holidays (Poland) run the weekend schedule, stored as calendar_dates exceptions
+  public_holidays: true
+  # fraction of trips left without any executions (planned only, e.g. new services)
+  unexecuted_trip_fraction: 0.02
+
+  # driver shifts: minutes between trips, daily driving limit, shift span (first start to last end),
+  # daily rest, days off in a 7-day rota
+  layover_minutes: 5
+  max_driver_minutes_per_day: 540
+  max_shift_span_minutes: 720
+  driver_daily_rest_minutes: 660
+  driver_days_off_per_week: 2
+
+  # vehicle downtime: a one-day inspection every N days, plus random multi-day repairs
+  # (0 to 2x vehicle_repairs_per_year per vehicle and year)
+  vehicle_inspection_interval_days: 30
+  vehicle_repairs_per_year: 2
+  vehicle_repair_days:
+    min: 2
+    max: 10
+
+  # driver absences per year, in calendar days: a summer holiday (June-August),
+  # other leave blocks at random dates, and sick leave (0 to 2x the value, in 1-5 day spells)
+  driver_summer_leave_days: 14
+  driver_other_leave_blocks: [7, 5]
+  driver_sick_days_per_year: 8
 
 performance:
   batch_size: 50000
